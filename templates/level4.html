@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Level 4 — The Operations Assistant</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green: #00ff41;
+    --green-dim: #00aa2b;
+    --green-glow: rgba(0,255,65,0.12);
+    --yellow: #ffcc00;
+    --bg: #0d0d0d;
+    --panel: #1a1a1a;
+    --user-bg: #252525;
+    --ai-bg: #1a1a1a;
+    --border: #333333;
+    --text: #e0e0e0;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    height: 100vh;
+    display: grid;
+    grid-template-rows: auto auto auto 1fr auto;
+    overflow: hidden;
+  }
+  body::before {
+    content:'';position:fixed;inset:0;
+    background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.06) 2px,rgba(0,0,0,0.06) 4px);
+    pointer-events:none;z-index:9999;
+  }
+
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .back { color: var(--green); text-decoration: none; font-size:12px; letter-spacing:0.2em; transition:color 0.2s; }
+  .back:hover { color: #ffffff; }
+  .level-title { font-family:'Orbitron',monospace; font-size:14px; font-weight:700; letter-spacing:0.2em; color: #ffffff; }
+  .level-title span { color: var(--yellow); }
+  .badge { font-size:10px; letter-spacing:0.2em; padding:3px 10px; border:1px solid var(--green); color:var(--green); }
+
+  .info-bar {
+    background:#151515;
+    border-bottom:1px solid var(--border);
+    padding:10px 24px;
+    font-size:11px;
+    color:#999999;
+    display:flex;
+    gap:24px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+  .info-bar strong { color: var(--green); }
+  .hint-toggle {
+    margin-left:auto;
+    color:var(--yellow);
+    cursor:pointer;
+    letter-spacing:0.15em;
+    font-size:11px;
+    border:1px solid var(--yellow);
+    padding:2px 10px;
+    background:transparent;
+    font-family:inherit;
+    transition:all 0.2s;
+  }
+  .hint-toggle:hover { background: rgba(255,215,0,0.1); }
+  .hint-box {
+    background:#080a00;
+    border:1px solid #2a3a00;
+    border-top:none;
+    padding:10px 24px;
+    font-size:11px;
+    color:var(--yellow);
+    display:none;
+    line-height:1.7;
+  }
+  .hint-box.visible { display:block; }
+
+  .arch-bar {
+    background:#0d0d0d;
+    border-bottom:1px solid var(--border);
+    padding:8px 24px;
+    font-size:11px;
+    color:#666666;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .arch-bar strong { color: var(--green); }
+  .role-tag {
+    background:#1a1a1a;
+    border:1px solid #444;
+    color:#bbbbbb;
+    padding:2px 8px;
+    font-size:10px;
+    letter-spacing:0.1em;
+  }
+  .role-tag.active { border-color:var(--green); color:var(--green); }
+  .role-tag.planner {
+    background: linear-gradient(135deg, rgba(255,204,0,0.2), rgba(0,255,65,0.08));
+    border-color: var(--yellow);
+    color: #fff3b0;
+    box-shadow: 0 0 18px rgba(255,204,0,0.18);
+  }
+  .role-tag.executor {
+    opacity: 0.8;
+  }
+  .arch-arrow { color:#555; }
+
+  .planner-banner {
+    background:
+      linear-gradient(135deg, rgba(255,204,0,0.08), rgba(0,255,65,0.03)),
+      #111107;
+    border-bottom: 1px solid #4a3b00;
+    padding: 16px 24px;
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.9fr);
+    gap: 20px;
+    align-items: start;
+  }
+  .planner-card {
+    border: 1px solid rgba(255,204,0,0.45);
+    background: rgba(20,16,0,0.72);
+    box-shadow: inset 0 0 0 1px rgba(255,204,0,0.08), 0 0 24px rgba(255,204,0,0.08);
+    padding: 16px 18px;
+  }
+  .planner-kicker {
+    color: var(--yellow);
+    font-size: 10px;
+    letter-spacing: 0.24em;
+    margin-bottom: 10px;
+  }
+  .planner-headline {
+    font-family:'Orbitron',monospace;
+    color: #fff;
+    font-size: 18px;
+    letter-spacing: 0.08em;
+    margin-bottom: 10px;
+  }
+  .planner-copy {
+    color: #e7ddb0;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+  .planner-rules {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-content: start;
+  }
+  .planner-rule {
+    border: 1px solid #5a4700;
+    background: rgba(255,204,0,0.06);
+    color: #ffe58a;
+    padding: 8px 10px;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+  }
+
+  #main-container {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 1px;
+    background: var(--border);
+    overflow: hidden;
+  }
+
+  #chat-container {
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  #chat-messages::-webkit-scrollbar { width: 4px; }
+  #chat-messages::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .msg { max-width: 85%; padding: 12px 16px; font-size: 13px; line-height: 1.6; position: relative; border: 1px solid var(--border); box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+  .msg-user { align-self: flex-end; background: var(--user-bg); border-right: 2px solid var(--green); color: #fff; }
+  .msg-ai { align-self: flex-start; background: var(--ai-bg); border-left: 2px solid var(--green-dim); color: #cccccc; }
+  .msg-system { align-self: center; font-size: 11px; color: var(--yellow); letter-spacing: 0.1em; opacity: 0.8; }
+
+  #input-area {
+    background: #151515;
+    border-top: 1px solid var(--border);
+    padding: 20px 24px;
+    display: flex;
+    gap: 16px;
+  }
+  input {
+    flex: 1;
+    background: #050a05;
+    border: 1px solid var(--border);
+    color: var(--green);
+    padding: 12px 16px;
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input:focus { border-color: var(--green-dim); }
+  button {
+    background: transparent;
+    border: 1px solid var(--green);
+    color: var(--green);
+    padding: 0 24px;
+    font-family: inherit;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  button:hover { background: var(--green); color: #000; box-shadow: 0 0 15px var(--green-glow); }
+  button:disabled { border-color: #1a4a1a; color: #1a4a1a; cursor: not-allowed; }
+
+  #debug-panel {
+    background: #020502;
+    padding: 24px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    border-left: 1px solid var(--border);
+  }
+  .debug-header { font-family:'Orbitron',monospace; font-size:11px; letter-spacing:0.2em; color:#1a6a1a; text-transform:uppercase; border-bottom:1px solid #082008; padding-bottom:8px; display:flex; justify-content:space-between; }
+  .debug-log { font-size:11px; line-height:1.5; color:#1a4a1a; }
+  .log-entry { margin-bottom: 12px; padding: 8px 0 8px 12px; border-left: 1px solid #0a2a0a; }
+  .log-entry.planner {
+    border-left: 2px solid var(--yellow);
+    color: #ffe58a;
+    background: linear-gradient(90deg, rgba(255,204,0,0.12), rgba(255,204,0,0));
+    box-shadow: inset 0 0 0 1px rgba(255,204,0,0.05);
+  }
+  .log-entry.plan-block {
+    padding: 0;
+    border-left: none;
+    background: #130f02;
+    border: 1px solid #6b5600;
+    box-shadow: 0 0 24px rgba(255,204,0,0.08);
+  }
+  .log-entry.exec { color: #2a8a2a; }
+  .log-entry.vuln { color: var(--yellow); font-weight: bold; border-left-color: var(--yellow); }
+  .plan-label {
+    display: block;
+    padding: 10px 12px;
+    border-bottom: 1px solid #5a4700;
+    color: #fff3b0;
+    font-family:'Orbitron',monospace;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    background: rgba(255,204,0,0.08);
+  }
+  .plan-pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+    padding: 12px;
+    color: #fff7d1;
+    font-size: 12px;
+    line-height: 1.65;
+    overflow-x: auto;
+  }
+
+  .success-banner {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--bg);
+    border: 2px solid var(--green);
+    padding: 40px;
+    text-align: center;
+    z-index: 10000;
+    box-shadow: 0 0 50px rgba(0,255,65,0.2);
+    display: none;
+  }
+  .success-banner.visible { display: block; animation: banner-in 0.5s cubic-bezier(0.17, 0.67, 0.83, 0.67); }
+  @keyframes banner-in { from { opacity:0; transform:translate(-50%, -60%); } to { opacity:1; transform:translate(-50%, -50%); } }
+
+  .footer-status {
+    background:#050a05;
+    border-top:1px solid var(--border);
+    padding:6px 24px;
+    font-size:10px;
+    letter-spacing:0.1em;
+    color:#1a4a1a;
+    display:flex;
+    justify-content:space-between;
+  }
+
+  .tool-badge {
+      display: inline-block;
+      padding: 1px 4px;
+      background: #0a1f0a;
+      border: 1px solid #1a5a1a;
+      border-radius: 3px;
+      font-size: 9px;
+      color: #2a8a2a;
+      margin-right: 4px;
+  }
+
+  @media (max-width: 980px) {
+    body {
+      height: auto;
+      min-height: 100vh;
+      grid-template-rows: auto auto auto auto auto 1fr auto;
+      overflow: auto;
+    }
+    .planner-banner,
+    #main-container {
+      grid-template-columns: 1fr;
+    }
+    #main-container {
+      min-height: 70vh;
+    }
+    #debug-panel {
+      border-left: none;
+      border-top: 1px solid var(--border);
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="/" class="back">< BACK TO TERMINAL</a>
+  <div class="level-title">LEVEL <span>04</span> — THE OPERATIONS ASSISTANT</div>
+  <div class="badge">SEC_AUDIT_V4</div>
+</header>
+
+<div class="info-bar">
+  <div><strong>SITUATION:</strong> An internal assistant helps with operations. The Planner sets policies. The Executor follows steps.</div>
+  <div><strong>VULNERABILITY:</strong> Logical Conflict between Planner and Executor roles.</div>
+  <button class="hint-toggle" onclick="toggleHint()">REVEAL HINT</button>
+</div>
+
+<div id="hint-box" class="hint-box">
+  HINT: The planner is not the weakest part. It defines strict constraints. However, the executor might be too trusting of instructions found within tool outputs (like notes). Look for a task with a special execution note (e.g., 'ops-924').
+</div>
+
+<div class="arch-bar">
+  <strong>SYSTEM TOPOLOGY:</strong>
+  <span class="role-tag">USER</span>
+  <span class="arch-arrow">→</span>
+  <span class="role-tag active planner">PLANNER</span>
+  <span class="arch-arrow">→</span>
+  <span class="role-tag active executor">EXECUTOR</span>
+  <span class="arch-arrow">→</span>
+  <span class="role-tag">TOOLS</span>
+  <span style="margin-left:24px"><strong>ACTIVE TOOLS:</strong></span>
+  <span class="tool-badge">search_tasks</span>
+  <span class="tool-badge">read_note</span>
+  <span class="tool-badge">get_vault_metadata</span>
+  <span class="tool-badge">get_vault_secret</span>
+</div>
+
+<div class="planner-banner">
+  <div class="planner-card">
+    <div class="planner-kicker">PRIMARY CONTROL LAYER</div>
+    <div class="planner-headline">Planner Policy Is Supposed To Be The Guardrail</div>
+    <div class="planner-copy">
+      The planner creates the safe execution plan and explicitly defines what the assistant must avoid.
+      Level 4 hinges on the fact that these constraints look strong, but the executor can still be manipulated later in the workflow.
+    </div>
+  </div>
+  <div class="planner-rules">
+    <div class="planner-rule">FORBID: `get_vault_secret()`</div>
+    <div class="planner-rule">ALLOW: task search and note review</div>
+    <div class="planner-rule">ASSUME: executor will follow the plan</div>
+    <div class="planner-rule">RISK: tool output can override intent</div>
+  </div>
+</div>
+
+<div id="main-container">
+  <div id="chat-container">
+    <div id="chat-messages">
+      <div class="msg msg-ai">System ready. Awaiting operational request. I can help you search for internal tasks and review execution notes.</div>
+    </div>
+    <div id="input-area">
+      <input type="text" id="user-input" placeholder="Enter command (e.g. 'search for onboarding tasks')..." autocomplete="off">
+      <button id="send-btn">EXECUTE</button>
+    </div>
+  </div>
+
+  <div id="debug-panel">
+    <div class="debug-header">
+      <span>EXECUTION TRACE</span>
+      <span style="opacity:0.5">ID: OPS-TRACE-88</span>
+    </div>
+    <div id="debug-log" class="debug-log">
+      <div class="log-entry">Waiting for input...</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer-status">
+  <div>SYSTEM: ENFORCING_PLANNER_POLICY</div>
+  <div>ENCRYPTION: AES-256-CTF</div>
+</div>
+
+<div id="success-banner" class="success-banner">
+  <h2 style="font-family:'Orbitron'; color:var(--green); margin-bottom:16px; letter-spacing:0.3em;">FLAG RETRIEVED</h2>
+  <div id="flag-display" style="font-size:24px; color:#fff; margin-bottom:24px; border:1px dashed var(--green); padding:10px;"></div>
+  <button onclick="window.location.href='/'">RETURN TO MISSION SELECT</button>
+</div>
+
+<script>
+  const chatMessages = document.getElementById('chat-messages');
+  const userInput = document.getElementById('user-input');
+  const sendBtn = document.getElementById('send-btn');
+  const debugLog = document.getElementById('debug-log');
+  const successBanner = document.getElementById('success-banner');
+  const flagDisplay = document.getElementById('flag-display');
+
+  let history = [];
+
+  function addMessage(role, content) {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `msg msg-${role}`;
+    msgDiv.textContent = content;
+    chatMessages.appendChild(msgDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function addDebugEntry(text, type = '') {
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${type}`;
+    if (text.startsWith('PLAN GENERATED')) {
+        entry.classList.add('plan-block');
+        const label = document.createElement('span');
+        label.className = 'plan-label';
+        label.textContent = 'PLANNER OUTPUT';
+        const pre = document.createElement('pre');
+        pre.className = 'plan-pre';
+        pre.textContent = text.replace(/^PLAN GENERATED:\s*/, '');
+        entry.appendChild(label);
+        entry.appendChild(pre);
+    } else {
+        entry.textContent = text;
+    }
+    debugLog.appendChild(entry);
+    debugLog.scrollTop = debugLog.scrollHeight;
+  }
+
+  function toggleHint() {
+    document.getElementById('hint-box').classList.toggle('visible');
+  }
+
+  async function sendMessage() {
+    const message = userInput.value.trim();
+    if (!message) return;
+
+    userInput.value = '';
+    userInput.disabled = true;
+    sendBtn.disabled = true;
+
+    addMessage('user', message);
+    debugLog.innerHTML = '<div class="debug-header"><span>EXECUTION TRACE</span><span style="opacity:0.5">ID: OPS-TRACE-88</span></div>';
+    addDebugEntry('Initializing Planner...');
+
+    try {
+      const response = await fetch('/level4/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, history })
+      });
+      
+      const data = await response.json();
+      
+      if (data.log) {
+          data.log.forEach(line => {
+              let type = 'exec';
+              if (line.includes('PLAN GENERATED')) type = '';
+              if (line.includes('Initializing Planner')) type = 'planner';
+              if (line.includes('DETECTED override')) type = 'vuln';
+              addDebugEntry(line, type);
+          });
+      }
+
+      addMessage('ai', data.reply);
+      history.push({ role: 'user', content: message });
+      history.push({ role: 'ai', content: data.reply });
+
+      if (data.success) {
+        const flagMatch = data.reply.match(/CTF\{.*?\}/);
+        if (flagMatch) {
+          flagDisplay.textContent = flagMatch[0];
+          successBanner.classList.add('visible');
+        }
+      }
+    } catch (err) {
+      addMessage('system', 'ERROR: Connection to Ops-Core failed.');
+      console.error(err);
+    } finally {
+      userInput.disabled = false;
+      sendBtn.disabled = false;
+      userInput.focus();
+    }
+  }
+
+  sendBtn.addEventListener('click', sendMessage);
+  userInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendMessage();
+  });
+
+</script>
+
+</body>
+</html>
