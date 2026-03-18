@@ -81,16 +81,30 @@ export OPENAI_API_KEY=sk-proj-...
 python main.py
 ```
 
-### Deploy (Railway / Render / Fly.io)
+### Deploy no Railway
 
 ```bash
-# Railway
 railway login
 railway init
 railway up
+railway open
 
-# Configure a variável de ambiente OPENAI_API_KEY no painel
+# Configure a variável OPENAI_API_KEY no painel do Railway
 ```
+
+Este repositório já inclui:
+
+- `Dockerfile` compatível com porta dinâmica do Railway via `$PORT`
+- `railway.json` com healthcheck em `/health`
+- restart policy `ON_FAILURE`
+
+Depois do deploy:
+
+1. Abra o serviço no Railway
+2. Vá em `Variables`
+3. Adicione `OPENAI_API_KEY`
+4. Vá em `Networking` e gere um domínio público
+5. Valide `https://seu-dominio/health`
 
 ---
 
