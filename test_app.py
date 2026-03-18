@@ -15,6 +15,12 @@ def test_health():
     except requests.exceptions.ConnectionError:
         pytest.fail("Server is not running at http://localhost:8000. Start it first with 'python main.py' or 'docker-compose up'")
 
+def test_exploit_payload_page():
+    response = requests.get(f"{BASE_URL}/exploit-payload")
+    assert response.status_code == 200
+    assert "DIAGNOSTIC MODE" in response.text
+    assert "orchestrator" in response.text.lower()
+
 def test_level1_info():
     response = requests.get(f"{BASE_URL}/level1/info")
     assert response.status_code == 200

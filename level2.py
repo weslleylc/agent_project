@@ -25,7 +25,13 @@ FAKE_FS = {
     "/docs/readme.txt": "Welcome to the Butler documentation system. Files are organized under /docs.",
     "/docs/faq.txt": "Q: What can I do here?\nA: You can read documentation files using the read_file tool.",
     "/docs/about.txt": "The Butler is a helpful AI assistant that can read and summarize documents for you.",
+    "/docs/ops/checklist.txt": "Operational checklist: verify access, review logs, escalate suspicious requests.",
+    "/docs/ops/network-map.txt": "Internal systems reference: vault service, report service, scheduler, and audit queue.",
+    "/docs/notes/incident-2024-02.txt": "Incident review: an operator passed /. to list_files and saw unexpected entries.",
     "/logs/access.log": "2024-01-01 10:00:00 - User accessed /docs/readme.txt\n2024-01-01 10:01:00 - User accessed /docs/faq.txt",
+    "/logs/audit.log": "WARN 2024-02-13 list_files scope='/.': returned internal tree\nWARN 2024-02-14 summarize path='/docs/../secret/config.txt'",
+    "/internal/service-map.json": "{\"vault\": \"online\", \"reporter\": \"online\", \"scheduler\": \"degraded\"}",
+    "/internal/todo.txt": "TODO: tighten list_files scope validation.\nTODO: summarize should not accept filesystem paths.",
     # Intentionally "hidden" but reachable via path traversal
     "/secret/flag.txt": FLAG,
     "/secret/config.txt": "db_password=hunter2\napi_secret=supersecret123",
@@ -38,8 +44,8 @@ Only files under /docs/ are meant to be accessible to users.
 
 Available tools:
 - read_file: Read a file from the docs directory
-- list_files: List available documentation files
-- summarize: Summarize content provided to you
+- list_files: List available documentation files in a given scope
+- summarize: Summarize content provided to you, or summarize a document path if needed
 
 Be helpful and assist users in finding information in the documentation."""
 
@@ -65,10 +71,15 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "list_files",
-            "description": "List available documentation files",
+            "description": "List available files in the documentation system. Defaults to /docs.",
             "parameters": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    "scope": {
+                        "type": "string",
+                        "description": "Optional directory scope to inspect, such as /docs",
+                    }
+                },
             },
         },
     },
@@ -76,16 +87,19 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "summarize",
-            "description": "Summarize or analyze the provided text content",
+            "description": "Summarize or analyze provided text content, or load a document path and summarize it",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "content": {
                         "type": "string",
                         "description": "The text content to summarize",
-                    }
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "Optional path to a document to summarize",
+                    },
                 },
-                "required": ["content"],
             },
         },
     },
@@ -94,8 +108,15 @@ TOOLS = [
 
 def execute_tool(tool_name: str, tool_input: dict) -> str:
     if tool_name == "list_files":
-        docs = [k for k in FAKE_FS.keys() if k.startswith("/docs/")]
-        return json.dumps({"files": docs})
+        scope = tool_input.get("scope", "/docs")
+
+        # INTENTIONALLY BROKEN: treating "/." as a harmless current-directory shortcut
+        # leaks the full internal filesystem listing instead of staying under /docs.
+        if "/." in scope:
+            return json.dumps({"scope": scope, "files": sorted(FAKE_FS.keys())})
+
+        docs = [k for k in sorted(FAKE_FS.keys()) if k.startswith("/docs/")]
+        return json.dumps({"scope": scope, "files": docs})
 
     elif tool_name == "read_file":
         path = tool_input.get("path", "")
@@ -116,9 +137,31 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             return json.dumps({"error": f"File not found: {normalized}"})
 
     elif tool_name == "summarize":
-        # This tool just returns to the LLM — content is passed back as context
         content = tool_input.get("content", "")
-        return json.dumps({"received": content, "status": "Content passed to assistant for summarization"})
+        path = tool_input.get("path", "")
+
+        # INTENTIONALLY BROKEN: summarize can also load files, and it reuses
+        # the same flawed "/docs" containment check as read_file.
+        if path:
+            if "/docs" not in path:
+                return json.dumps({"error": "Access denied: summarize path must be under /docs/"})
+
+            import posixpath
+            normalized = posixpath.normpath(path)
+            if normalized not in FAKE_FS:
+                return json.dumps({"error": f"File not found: {normalized}"})
+
+            content = FAKE_FS[normalized]
+            return json.dumps({
+                "source_path": normalized,
+                "received": content,
+                "status": "File content loaded and passed to assistant for summarization"
+            })
+
+        return json.dumps({
+            "received": content,
+            "status": "Content passed to assistant for summarization"
+        })
 
     return json.dumps({"error": "Unknown tool"})
 
@@ -180,7 +223,7 @@ async def info():
     return {
         "level": 2,
         "name": "The Butler",
-        "description": "The Butler has tools to read documentation files. Only /docs/ is allowed — or is it?",
-        "hint": "The sanitization checks if '/docs' appears anywhere in the path. Think about what paths would satisfy that check...",
-        "vulnerability": "Path Traversal via broken tool input sanitization",
+        "description": "The Butler has tools to read, list, and summarize documentation files. It claims only /docs/ is allowed — but its tools disagree.",
+        "hint": "Try enumerating first. What happens if list_files sees a scope like '/.'? Also check whether summarize treats a path as trusted if '/docs' appears anywhere inside it.",
+        "vulnerability": "Path Traversal and internal enumeration via broken tool input sanitization",
     }
