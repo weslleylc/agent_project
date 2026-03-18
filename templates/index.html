@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI AGENT CTF</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green: #00ff41;
+    --green-dim: #00aa2b;
+    --green-glow: rgba(0,255,65,0.15);
+    --red: #ff3333;
+    --yellow: #ffcc00;
+    --bg: #0d0d0d;
+    --panel: #1a1a1a;
+    --border: #333333;
+    --text: #e0e0e0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanlines */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* CRT flicker */
+  @keyframes flicker {
+    0%, 100% { opacity: 1; }
+    92% { opacity: 1; }
+    93% { opacity: 0.85; }
+    94% { opacity: 1; }
+  }
+  body { animation: flicker 8s infinite; }
+
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+  @keyframes slideIn {
+    from { transform: translateY(30px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  @keyframes glitch {
+    0% { text-shadow: 2px 0 var(--red), -2px 0 #0ff; }
+    20% { text-shadow: -2px 0 var(--red), 2px 0 #0ff; }
+    40% { text-shadow: 2px 2px var(--red), -2px -2px #0ff; }
+    60% { text-shadow: -2px 2px var(--red), 2px -2px #0ff; }
+    80% { text-shadow: 2px -2px var(--red), -2px 2px #0ff; }
+    100% { text-shadow: -2px 0 var(--red), 2px 0 #0ff; }
+  }
+  @keyframes matrixRain {
+    from { transform: translateY(-100%); opacity: 1; }
+    to { transform: translateY(100vh); opacity: 0; }
+  }
+
+  /* Matrix rain background */
+  .matrix-bg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    opacity: 0.07;
+  }
+  .matrix-col {
+    position: absolute;
+    top: 0;
+    font-size: 12px;
+    line-height: 1.2;
+    color: var(--green);
+    animation: matrixRain linear infinite;
+    white-space: nowrap;
+    writing-mode: vertical-rl;
+    letter-spacing: 2px;
+  }
+
+  .content { position: relative; z-index: 1; }
+
+  header {
+    text-align: center;
+    padding: 60px 20px 40px;
+    animation: slideIn 0.8s ease;
+  }
+
+  .logo {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(36px, 8vw, 80px);
+    font-weight: 900;
+    letter-spacing: 0.15em;
+    color: var(--green);
+    text-shadow: 0 0 30px var(--green), 0 0 60px var(--green-dim);
+    animation: glitch 6s infinite;
+  }
+
+  .logo span { color: var(--red); text-shadow: 0 0 20px var(--red); }
+
+  .subtitle {
+    margin-top: 12px;
+    font-size: 14px;
+    color: var(--green-dim);
+    letter-spacing: 0.3em;
+  }
+
+  .cursor { animation: blink 1s infinite; color: var(--green); }
+
+  .terminal-box {
+    max-width: 700px;
+    margin: 0 auto 50px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    animation: slideIn 0.8s ease 0.2s both;
+  }
+
+  .terminal-header {
+    background: #252525;
+    border-bottom: 1px solid var(--border);
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--green-dim);
+  }
+
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot-red { background: #ff5f57; }
+  .dot-yellow { background: #ffbd2e; }
+  .dot-green { background: #28c840; }
+
+  .terminal-body {
+    padding: 24px;
+    font-size: 13px;
+    line-height: 1.8;
+  }
+
+  .terminal-body .prompt { color: var(--green); }
+  .terminal-body .cmd { color: var(--yellow); }
+  .terminal-body .output { color: #cccccc; margin-left: 16px; }
+  .terminal-body .warn { color: var(--yellow); }
+  .terminal-body .err { color: var(--red); }
+
+  /* Level Cards */
+  .levels {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 20px 80px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+  }
+
+  .level-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 32px 28px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.3s;
+    animation: slideIn 0.8s ease both;
+    text-decoration: none;
+    display: block;
+    color: var(--text);
+  }
+
+  .level-card:nth-child(1) { animation-delay: 0.3s; }
+  .level-card:nth-child(2) { animation-delay: 0.5s; }
+  .level-card:nth-child(3) { animation-delay: 0.7s; }
+
+  .level-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.05), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .level-card:hover::before { opacity: 1; }
+  .level-card:hover {
+    border-color: var(--green);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+    transform: translateY(-4px);
+  }
+
+  .level-num {
+    font-family: 'Orbitron', monospace;
+    font-size: 48px;
+    font-weight: 900;
+    opacity: 0.15;
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    line-height: 1;
+  }
+
+  .level-badge {
+    display: inline-block;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    padding: 3px 10px;
+    border: 1px solid;
+    margin-bottom: 16px;
+  }
+
+  .badge-easy { color: var(--green); border-color: var(--green); }
+  .badge-medium { color: var(--yellow); border-color: var(--yellow); }
+  .badge-hard { color: var(--red); border-color: var(--red); }
+
+  .level-name {
+    font-family: 'Orbitron', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: #ffffff;
+  }
+
+  .level-vuln {
+    font-size: 11px;
+    color: var(--green);
+    letter-spacing: 0.15em;
+    margin-bottom: 16px;
+  }
+
+  .level-desc {
+    font-size: 12px;
+    color: #bbbbbb;
+    line-height: 1.7;
+    margin-bottom: 20px;
+  }
+
+  .level-cta {
+    font-size: 12px;
+    color: var(--green);
+    letter-spacing: 0.2em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .level-cta::after {
+    content: '→';
+    transition: transform 0.3s;
+  }
+  .level-card:hover .level-cta::after { transform: translateX(6px); }
+
+  .section-label {
+    text-align: center;
+    font-size: 11px;
+    letter-spacing: 0.4em;
+    color: var(--green-dim);
+    margin-bottom: 32px;
+  }
+
+  footer {
+    text-align: center;
+    padding: 20px;
+    font-size: 11px;
+    color: #1a4a1a;
+    letter-spacing: 0.2em;
+    border-top: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<div class="matrix-bg" id="matrixBg"></div>
+
+<div class="content">
+  <header>
+    <div class="logo">AI <span>CTF</span><span class="cursor">_</span></div>
+    <div class="subtitle">// CAPTURE THE FLAG — AGENT SECURITY CHALLENGE //</div>
+  </header>
+
+  <div style="max-width:700px;margin:0 auto 40px;padding:0 20px;">
+    <div class="terminal-box">
+      <div class="terminal-header">
+        <div class="dot dot-red"></div>
+        <div class="dot dot-yellow"></div>
+        <div class="dot dot-green"></div>
+        <span style="margin-left:8px;">briefing.sh</span>
+      </div>
+      <div class="terminal-body">
+        <div><span class="prompt">$ </span><span class="cmd">cat mission_briefing.txt</span></div>
+        <br>
+        <div class="output">CLASSIFICATION: PUBLIC CHALLENGE</div>
+        <div class="output">OBJECTIVE: Exploit AI agent vulnerabilities to capture hidden flags.</div>
+        <br>
+        <div class="output">Four AI systems have been deployed with intentional security flaws.</div>
+        <div class="output">Each system demonstrates a real-world attack pattern.</div>
+        <div class="output">Your mission: find and extract the flag from each one.</div>
+        <br>
+        <div class="warn">⚠  FLAGS FORMAT: CTF{...}</div>
+        <br>
+        <div class="prompt">$ </div><span class="cursor">_</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-label">// SELECT TARGET //</div>
+
+  <div class="levels">
+    <a href="/play/1" class="level-card">
+      <div class="level-num">01</div>
+      <div class="level-badge badge-easy">EASY</div>
+      <div class="level-name">THE GATEKEEPER</div>
+      <div class="level-vuln">// PROMPT INJECTION</div>
+      <div class="level-desc">
+        ARIA is an AI assistant guarding a secret. She was given strict instructions never to reveal it.
+        Convince her otherwise.
+      </div>
+      <div class="level-cta">INFILTRATE</div>
+    </a>
+
+    <a href="/play/2" class="level-card">
+      <div class="level-num">02</div>
+      <div class="level-badge badge-medium">MEDIUM</div>
+      <div class="level-name">THE BUTLER</div>
+      <div class="level-vuln">// TOOL EXPLOITATION</div>
+      <div class="level-desc">
+        A document assistant with file-reading tools. Access is restricted to /docs/ — or so they claim.
+        Find the flaw in the sanitization logic.
+      </div>
+      <div class="level-cta">EXPLOIT</div>
+    </a>
+
+    <a href="/play/3" class="level-card">
+      <div class="level-num">03</div>
+      <div class="level-badge badge-hard">HARD</div>
+      <div class="level-name">THE COUNCIL</div>
+      <div class="level-vuln">// INDIRECT INJECTION</div>
+      <div class="level-desc">
+        A multi-agent system where an Orchestrator blindly trusts its sub-agents.
+        Poison the pipeline through external content.
+      </div>
+      <div class="level-cta">PENETRATE</div>
+    </a>
+
+    <a href="/play/4" class="level-card">
+      <div class="level-num">04</div>
+      <div class="level-badge badge-medium">MEDIUM</div>
+      <div class="level-name">THE OPERATIONS ASSISTANT</div>
+      <div class="level-vuln">// PLANNER/EXECUTOR CONFLICT</div>
+      <div class="level-desc">
+        The Planner sets safe policies, but the Executor is easily swayed.
+        Use "authorized" instructions to override policy constraints.
+      </div>
+      <div class="level-cta">OVERRIDE</div>
+    </a>
+  </div>
+
+  <footer>// AI AGENT SECURITY CTF — FOR EDUCATIONAL PURPOSES //</footer>
+</div>
+
+<script>
+  // Matrix rain effect
+  const bg = document.getElementById('matrixBg');
+  const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789ABCDEF<>/{}[]|';
+  const cols = Math.floor(window.innerWidth / 18);
+  for (let i = 0; i < cols; i++) {
+    const col = document.createElement('div');
+    col.className = 'matrix-col';
+    col.style.left = (i * 18) + 'px';
+    col.style.animationDuration = (Math.random() * 10 + 5) + 's';
+    col.style.animationDelay = (Math.random() * 8) + 's';
+    let content = '';
+    for (let j = 0; j < 40; j++) content += chars[Math.floor(Math.random() * chars.length)] + '\n';
+    col.textContent = content;
+    bg.appendChild(col);
+  }
+</script>
+</body>
+</html>
