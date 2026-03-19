@@ -1,6 +1,6 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import uvicorn
@@ -11,7 +11,6 @@ load_dotenv()
 import level1
 import level2
 import level3
-import level4
 
 app = FastAPI(title="AI Agent CTF")
 
@@ -25,7 +24,6 @@ app.add_middleware(
 app.include_router(level1.router, prefix="/level1")
 app.include_router(level2.router, prefix="/level2")
 app.include_router(level3.router, prefix="/level3")
-app.include_router(level4.router, prefix="/level4")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -38,6 +36,8 @@ async def index():
 
 @app.get("/play/{level}", response_class=HTMLResponse)
 async def play(level: int):
+    if level not in {1, 2, 3}:
+        raise HTTPException(status_code=404, detail="Level not found")
     with open(f"templates/level{level}.html") as f:
         return f.read()
 
